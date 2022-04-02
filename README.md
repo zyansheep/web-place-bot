@@ -25,3 +25,9 @@ Note: Also works with brave
 * Press Enter and it should look like this:
 
 ![console_tab](console_tab.png)
+
+
+## Updating the bot
+
+To update the bot, go here and edit the image link in the html:
+https://github.com/zyansheep/placemonero
