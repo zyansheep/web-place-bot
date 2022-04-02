@@ -70,21 +70,16 @@ function fetch_canvas_url(cont, auth) {
 }
 
 function load_image_url(cont, url) {
-	let image = new Image()
-	image.src = url
-
+	var image = document.createElement("img");
 	image.onload = () => {
 		cont(image)
 	}
+	image.src = url
+	image.setAttribute("crossorigin", "")
 }
 
 function extract_image_section_data(image, x, y, dx, dy) {
-	let canvas = undefined;
-	try {
-		canvas = document.createElement('canvas')
-		canvas.parentNode.removeChild(canvas);
-	} catch (e) {}
-	canvas = document.createElement('canvas')
+	var canvas = document.createElement('canvas')
 	canvas.width = image.width
 	canvas.height = image.height
 	var ctx = canvas.getContext('2d')
@@ -134,12 +129,19 @@ function calculate_changes(current_image, reference_image) {
 	}
 	
 	changes = []
-	for (i = 0; i < current_image.length; i += 4) {
+	let cur_array = current_image.data;
+	let ref_array = reference_image.data;
+	for (let i = 0; i < cur_array.length; i += 4) {
 		if (changes.length >= 400) { return changes }
-		if (current_image.data.slice(i, i + 4) === reference_image.data.slice(i, i + 4)) {
+		let cur_array_slice = cur_array.slice(i, i + 4);
+		let ref_array_slice = ref_array.slice(i, i + 4);
+		if (cur_array_slice.every((value, index) => value !== ref_array_slice[index])) {
 			let hex_color = toHexString(reference_image.data.slice(i, i + 4))
 			let color = color_map[hex_color.toUpperCase()];
-			changes.push({ x, y, color })
+			if (color) {
+				let col_index = i / 4;
+				changes.push({ x: col_index % reference_image.width, y: Math.floor(col_index / reference_image.width), color })
+			}
 		}
 	}
 	return changes
@@ -161,18 +163,39 @@ function send_change(cont, auth, x, y, color) {
 	}).then(cont)
 }
 
+var override_ineffective = false;
 function check_map_and_place(auth_token) {
 	if (document.design) {
 		let design = document.design;
 		get_board_image((current_image) => {
 			get_reference_image((reference_image) => {
 				let changes = calculate_changes(current_image, reference_image);
-				let change = select_change(changes)
-				console.log("Changing:", change);
-				send_change((resp) => {}, change.x, change.y, change.color)
+				if (changes.length > 0) {
+					console.log(changes.length + " changes found");
+					if (changes.length >= 400) {
+						if (override_ineffective) {
+							console.log("There are many changes, but we persevere anyway")
+						} else {
+							console.log("There are too many changes, the design may be old")
+							return
+						}
+					} else if (override_ineffective) { override_ineffective = false }
+					let change = select_change(changes)
+					change.x += design.x;
+					change.y += design.y;
+					console.log("Changing Pixel:", change);
+					send_change((resp) => {}, change.x, change.y, change.color)
+				} else {
+					console.log("No unmatching pixels found")
+				}
+				
 			}, design.url, design.width, design.height)
-		}, auth_token, 0, 0, design.width, design.height)
+		}, auth_token, design.x, design.y, design.width, design.height)
 	} else {
 		console.error("No design received from iframe")
 	}
 }
+check_map_and_place(auth)
+setInterval(() => {
+	check_map_and_place(auth)
+}, 302000)
