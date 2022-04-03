@@ -1,4 +1,6 @@
-# Browser Place Bot
+# Browser Place Bot (WIP)
+
+NOTE: This is still in testing phase and does not work yet
 
 * Launch your browser of choice with the following options from the command line:
 
